@@ -1006,60 +1006,69 @@ async function fetchRate() {
   }
 }
 
-// ─── EXPENSES ────────────────────────────────────
-let expenses = JSON.parse(localStorage.getItem('mango_expenses') || '[]');
+// ─── SUPABASE ────────────────────────────────────
+const SB_URL = 'https://nyrbkzdsahobdvtxxuzu.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55cmJremRzYWhvYmR2dHh4dXp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNzE1NTksImV4cCI6MjA5Njk0NzU1OX0.6eCTCWQ507R1Lq8mHmQEodEdUoz_wGPsFzWdDUZyUCg';
 
-function saveExpenses() {
-  localStorage.setItem('mango_expenses', JSON.stringify(expenses));
+async function sbFetch(path, options = {}) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': options.prefer || '',
+      ...options.headers,
+    },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
 }
 
-function renderMoney() {
-  // 날짜 셀렉터 채우기
-  const sel = document.getElementById('exp-day');
-  if (sel.children.length <= 1) {
-    TRIP.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.day;
-      opt.textContent = `${d.day}일 ${d.date}`;
-      sel.appendChild(opt);
-    });
-  }
-  // 이름 반영
-  const myName = localStorage.getItem('mango_diary_name') || '망고';
-  document.getElementById('exp-who').options[0].text = myName;
-  document.getElementById('exp-who').options[0].value = myName;
+// ─── EXPENSES (Supabase 공유) ─────────────────────
+let expenses = [];
 
-  // 환율 복원
-  if (currentRate) {
-    document.getElementById('rate-input').value = currentRate;
-    updateRateDisplay();
+async function loadExpenses() {
+  try {
+    expenses = await sbFetch('expenses?order=created_at.asc');
+    renderExpenseList();
+    renderExpenseSummary();
+  } catch(e) {
+    showToast('❌ 지출 불러오기 실패 (인터넷 확인)');
   }
-
-  renderExpenseList();
-  renderExpenseSummary();
 }
 
-function addExpense() {
+async function addExpense() {
   const day = document.getElementById('exp-day').value;
   const desc = document.getElementById('exp-desc').value.trim();
   const amount = parseFloat(document.getElementById('exp-amount').value);
   const cat = document.getElementById('exp-cat').value;
   const who = document.getElementById('exp-who').value;
   if (!day || !desc || !amount) { showToast('날짜, 내용, 금액을 입력해주세요'); return; }
-  expenses.push({ id: Date.now(), day: parseInt(day), desc, amount, cat, who });
-  saveExpenses();
-  document.getElementById('exp-desc').value = '';
-  document.getElementById('exp-amount').value = '';
-  renderExpenseList();
-  renderExpenseSummary();
-  showToast('✅ 추가됐어요');
+  try {
+    await sbFetch('expenses', {
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: JSON.stringify({ day: parseInt(day), desc, amount, cat, who }),
+    });
+    document.getElementById('exp-desc').value = '';
+    document.getElementById('exp-amount').value = '';
+    showToast('✅ 추가됐어요');
+    await loadExpenses();
+  } catch(e) {
+    showToast('❌ 저장 실패 (인터넷 확인)');
+  }
 }
 
-function deleteExpense(id) {
-  expenses = expenses.filter(e => e.id !== id);
-  saveExpenses();
-  renderExpenseList();
-  renderExpenseSummary();
+async function deleteExpense(id) {
+  try {
+    await sbFetch(`expenses?id=eq.${id}`, { method: 'DELETE' });
+    showToast('🗑 삭제됐어요');
+    await loadExpenses();
+  } catch(e) {
+    showToast('❌ 삭제 실패');
+  }
 }
 
 function renderExpenseList() {
@@ -1080,7 +1089,7 @@ function renderExpenseList() {
           <div style="font-size:11px;color:#888;margin-top:2px;">${trip ? trip.date : ''} · ${e.who}</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:14px;font-weight:700;color:var(--alpine);">€${e.amount.toFixed(2)}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--alpine);">€${Number(e.amount).toFixed(2)}</div>
           ${krw}
         </div>
         <button onclick="deleteExpense(${e.id})" style="background:none;border:none;font-size:16px;cursor:pointer;color:#ccc;padding:4px;">×</button>
@@ -1092,13 +1101,13 @@ function renderExpenseList() {
 function renderExpenseSummary() {
   const el = document.getElementById('expense-summary');
   if (!el) return;
-  const total = expenses.reduce((s, e) => s + e.amount, 0);
+  const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const myName = localStorage.getItem('mango_diary_name') || '망고';
-  const myTotal = expenses.filter(e => e.who === myName || e.who === '공통').reduce((s, e) => s + (e.who === '공통' ? e.amount/2 : e.amount), 0);
-  const sisterTotal = expenses.filter(e => e.who === '언니' || e.who === '공통').reduce((s, e) => s + (e.who === '공통' ? e.amount/2 : e.amount), 0);
+  const myTotal = expenses.filter(e => e.who === myName || e.who === '공통').reduce((s, e) => s + (e.who === '공통' ? Number(e.amount)/2 : Number(e.amount)), 0);
+  const sisterTotal = expenses.filter(e => e.who === '언니' || e.who === '공통').reduce((s, e) => s + (e.who === '공통' ? Number(e.amount)/2 : Number(e.amount)), 0);
 
   const bycat = {};
-  expenses.forEach(e => { bycat[e.cat] = (bycat[e.cat] || 0) + e.amount; });
+  expenses.forEach(e => { bycat[e.cat] = (bycat[e.cat] || 0) + Number(e.amount); });
   const catRows = Object.entries(bycat).sort((a,b)=>b[1]-a[1])
     .map(([cat, amt]) => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;"><span>${cat}</span><span style="font-weight:600;">€${amt.toFixed(2)}${currentRate ? ` <span style="color:#aaa;font-weight:400;">(${Math.round(amt*currentRate).toLocaleString()}원)</span>` : ''}</span></div>`).join('');
 
@@ -1113,19 +1122,39 @@ function renderExpenseSummary() {
   `;
 }
 
+function renderMoney() {
+  const sel = document.getElementById('exp-day');
+  if (sel.children.length <= 1) {
+    TRIP.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.day;
+      opt.textContent = `${d.day}일 ${d.date}`;
+      sel.appendChild(opt);
+    });
+  }
+  const myName = localStorage.getItem('mango_diary_name') || '망고';
+  document.getElementById('exp-who').options[0].text = myName;
+  document.getElementById('exp-who').options[0].value = myName;
+  if (currentRate) {
+    document.getElementById('rate-input').value = currentRate;
+    updateRateDisplay();
+  }
+  loadExpenses();
+}
+
 function exportExpense() {
   const myName = localStorage.getItem('mango_diary_name') || '망고';
-  let text = `💶 ${myName}의 몽블랑 여행 정산\n\n`;
-  const total = expenses.reduce((s,e)=>s+e.amount,0);
+  let text = `💶 몽블랑 여행 정산\n\n`;
+  const total = expenses.reduce((s,e)=>s+Number(e.amount),0);
   const sorted = [...expenses].sort((a,b)=>a.day-b.day);
   sorted.forEach(e => {
     const trip = TRIP.find(t=>t.day===e.day);
     const krw = currentRate ? ` (≈${Math.round(e.amount*currentRate).toLocaleString()}원)` : '';
-    text += `${trip.date} [${e.cat}] ${e.desc} - €${e.amount.toFixed(2)}${krw} · ${e.who}\n`;
+    text += `${trip.date} [${e.cat}] ${e.desc} - €${Number(e.amount).toFixed(2)}${krw} · ${e.who}\n`;
   });
   text += `\n${'─'.repeat(30)}\n총합: €${total.toFixed(2)}`;
   if (currentRate) text += ` (≈${Math.round(total*currentRate).toLocaleString()}원)`;
-  download(`${myName}_여행정산.txt`, text);
+  download(`몽블랑_여행정산.txt`, text);
   showToast('📄 정산 내보내기 완료');
 }
 
