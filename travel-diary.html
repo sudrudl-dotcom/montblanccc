@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>몽블랑 여행 일기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500&display=swap');
+
+  :root {
+    --ink: #1a1a2e;
+    --mist: #e8eef4;
+    --snow: #f7f9fb;
+    --alpine: #3d6b8a;
+    --glacier: #7aaec4;
+    --sunset: #c4795a;
+    --moss: #5a7a5c;
+    --gold: #c4a35a;
+    --white: #ffffff;
+    --shadow: rgba(26,26,46,0.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--snow); color: var(--ink); font-family: 'Noto Sans KR', sans-serif; }
+
+  /* ─── SHELL ─────────────────────────────────── */
+  #app { max-width: 430px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+  /* ─── HEADER ────────────────────────────────── */
+  .app-header {
+    background: var(--alpine);
+    color: var(--white);
+    padding: 18px 20px 14px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px var(--shadow);
+  }
+  .app-header h1 { font-family: 'Noto Serif KR', serif; font-size: 17px; font-weight: 700; letter-spacing: 0.01em; }
+  .app-header .subtitle { font-size: 11px; opacity: 0.75; margin-top: 2px; font-weight: 300; letter-spacing: 0.05em; }
+
+  /* ─── NAV TABS ───────────────────────────────── */
+  .nav-tabs {
+    display: flex; background: var(--white);
+    border-bottom: 1px solid var(--mist);
+    position: sticky; top: 62px; z-index: 90;
+  }
+  .nav-tab {
+    flex: 1; padding: 12px 4px 10px;
+    text-align: center; font-size: 12px; font-weight: 500;
+    color: #888; border: none; background: none; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .nav-tab.active { color: var(--alpine); border-bottom-color: var(--alpine); font-weight: 600; }
+  .nav-tab .tab-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+
+  /* ─── SCREENS ────────────────────────────────── */
+  .screen { display: none; flex: 1; overflow-y: auto; padding-bottom: 80px; }
+  .screen.active { display: block; }
+
+  /* ─── TIMELINE (홈) ──────────────────────────── */
+  .timeline { padding: 16px; }
+  .day-card {
+    background: var(--white);
+    border-radius: 14px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 8px var(--shadow);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .day-card:active { transform: scale(0.98); }
+  .day-card-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px 12px;
+  }
+  .day-number {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Serif KR', serif; font-size: 15px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .day-number.trekking { background: var(--alpine); color: var(--white); }
+  .day-number.city { background: var(--sunset); color: var(--white); }
+  .day-number.empty { background: var(--mist); color: #aaa; }
+  .day-meta { flex: 1; }
+  .day-date { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .day-location { font-size: 11px; color: #888; margin-top: 2px; }
+  .day-status { font-size: 18px; }
+  .day-preview {
+    padding: 0 16px 14px;
+    font-size: 13px; color: #555; line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .day-photos {
+    display: flex; gap: 3px; padding: 0 16px 14px; overflow-x: auto;
+  }
+  .day-photo-thumb {
+    width: 64px; height: 64px; border-radius: 8px;
+    object-fit: cover; flex-shrink: 0;
+    background: var(--mist);
+  }
+  .photo-placeholder {
+    width: 64px; height: 64px; border-radius: 8px;
+    background: var(--mist); display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .day-tag {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 2px 8px; border-radius: 20px; margin-bottom: 8px; margin-left: 16px;
+  }
+  .tag-trekking { background: #e8f2f8; color: var(--alpine); }
+  .tag-city { background: #faeee9; color: var(--sunset); }
+  .tag-free { background: #eef5ef; color: var(--moss); }
+
+  /* ─── WRITE SCREEN ───────────────────────────── */
+  .write-screen { padding: 0; }
+  .write-day-selector {
+    background: var(--white); padding: 14px 16px;
+    border-bottom: 1px solid var(--mist);
+    overflow-x: auto; display: flex; gap: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .write-day-btn {
+    flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
+    border: 1.5px solid var(--mist); background: var(--white);
+    font-size: 12px; font-weight: 500; color: #888; cursor: pointer;
+    white-space: nowrap; transition: all 0.15s;
+  }
+  .write-day-btn.selected { border-color: var(--alpine); background: var(--alpine); color: var(--white); }
+  .write-form { padding: 16px; }
+  .form-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; margin-top: 18px; display: block; }
+  .form-label:first-child { margin-top: 0; }
+  .form-input, .form-textarea {
+    width: 100%; border: 1.5px solid var(--mist);
+    border-radius: 10px; padding: 11px 13px;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 14px; color: var(--ink);
+    background: var(--white); outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus, .form-textarea:focus { border-color: var(--alpine); }
+  .form-textarea { min-height: 140px; resize: vertical; line-height: 1.7; }
+  .mood-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .mood-btn {
+    padding: 8px 14px; border-radius: 20px;
+    border: 1.5px solid var(--mist); background: var(--white);
+    font-size: 13px; cursor: pointer; transition: all 0.15s;
+  }
+  .mood-btn.selected { border-color: var(--gold); background: #fdf8ee; }
+  .photo-upload-area {
+    border: 2px dashed var(--mist); border-radius: 12px;
+    padding: 20px; text-align: center; cursor: pointer;
+    background: var(--snow); transition: border-color 0.2s;
+  }
+  .photo-upload-area:hover { border-color: var(--glacier); }
+  .photo-upload-area .upload-icon { font-size: 28px; }
+  .photo-upload-area p { font-size: 12px; color: #888; margin-top: 6px; }
+  #photo-input { display: none; }
+  .photo-preview-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .preview-thumb {
+    width: 72px; height: 72px; border-radius: 8px;
+    object-fit: cover; position: relative;
+  }
+  .preview-wrap { position: relative; width: 72px; height: 72px; }
+  .preview-remove {
+    position: absolute; top: -6px; right: -6px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--sunset); color: white; border: none;
+    font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px var(--shadow);
+  }
+  .weather-row { display: flex; gap: 8px; }
+  .weather-btn {
+    flex: 1; padding: 10px 4px; border-radius: 10px;
+    border: 1.5px solid var(--mist); background: var(--white);
+    font-size: 20px; text-align: center; cursor: pointer; transition: all 0.15s;
+  }
+  .weather-btn.selected { border-color: var(--glacier); background: #e8f4f9; }
+  .save-btn {
+    width: 100%; margin-top: 24px; padding: 15px;
+    background: var(--alpine); color: white;
+    border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+    font-family: 'Noto Sans KR', sans-serif; cursor: pointer; transition: opacity 0.2s;
+    box-shadow: 0 3px 12px rgba(61,107,138,0.35);
+  }
+  .save-btn:active { opacity: 0.85; }
+
+  /* ─── DETAIL VIEW ────────────────────────────── */
+  .detail-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: var(--snow); overflow-y: auto;
+  }
+  .detail-overlay.open { display: block; }
+  .detail-header {
+    background: var(--alpine); color: white;
+    padding: 18px 16px 16px; display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .back-btn {
+    background: rgba(255,255,255,0.2); border: none; color: white;
+    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+  }
+  .detail-title { font-family: 'Noto Serif KR', serif; font-size: 16px; font-weight: 700; }
+  .detail-body { padding: 20px 16px; }
+  .detail-weather { font-size: 28px; margin-bottom: 12px; }
+  .detail-mood-chip {
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    background: #fdf8ee; color: var(--gold); font-size: 12px; font-weight: 600; margin-bottom: 16px;
+  }
+  .detail-text { font-size: 14px; line-height: 1.85; color: #333; white-space: pre-wrap; margin-bottom: 20px; }
+  .detail-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 20px; }
+  .detail-photo { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
+  .detail-edit-btn {
+    width: 100%; padding: 13px;
+    border: 1.5px solid var(--alpine); color: var(--alpine);
+    background: white; border-radius: 10px; font-size: 14px; font-weight: 600;
+    font-family: 'Noto Sans KR', sans-serif; cursor: pointer;
+  }
+
+  /* ─── EXPORT SCREEN ──────────────────────────── */
+  .export-screen { padding: 16px; }
+  .export-card {
+    background: var(--white); border-radius: 14px; padding: 18px;
+    margin-bottom: 14px; box-shadow: 0 1px 8px var(--shadow);
+  }
+  .export-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .export-card p { font-size: 12px; color: #888; line-height: 1.6; margin-bottom: 14px; }
+  .export-btn {
+    width: 100%; padding: 12px; border-radius: 10px; border: none;
+    font-size: 13px; font-weight: 600; font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer; transition: opacity 0.2s;
+  }
+  .export-btn:active { opacity: 0.8; }
+  .export-btn.primary { background: var(--alpine); color: white; }
+  .export-btn.secondary { background: var(--sunset); color: white; }
+  .export-btn.tertiary { background: var(--moss); color: white; }
+  .stat-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .stat-box { flex: 1; background: var(--snow); border-radius: 10px; padding: 12px; text-align: center; }
+  .stat-num { font-family: 'Noto Serif KR', serif; font-size: 24px; font-weight: 700; color: var(--alpine); }
+  .stat-label { font-size: 10px; color: #888; margin-top: 2px; }
+
+  /* ─── TOAST ──────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: white; padding: 10px 20px; border-radius: 20px;
+    font-size: 13px; z-index: 300; opacity: 0; transition: opacity 0.3s;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ─── SCHEDULE SECTION ──────────────────────── */
+  .schedule-section { border-top: 1px solid var(--mist); }
+  .schedule-toggle {
+    padding: 10px 16px; font-size: 12px; font-weight: 600;
+    color: var(--alpine); cursor: pointer; display: flex; align-items: center; gap: 6px;
+    user-select: none;
+  }
+  .sched-arrow { font-size: 11px; transition: transform 0.2s; }
+  .schedule-body { padding: 4px 16px 14px; background: var(--snow); }
+  .sched-row {
+    display: flex; gap: 10px; padding: 5px 0;
+    border-bottom: 1px solid var(--mist); font-size: 12px;
+  }
+  .sched-row:last-of-type { border-bottom: none; }
+  .sched-time { color: var(--alpine); font-weight: 600; white-space: nowrap; min-width: 48px; }
+  .sched-desc { color: #444; line-height: 1.5; }
+  .accom-row {
+    margin-top: 10px; padding: 8px 10px; background: #eef5fb;
+    border-radius: 8px; font-size: 12px; color: #444; line-height: 1.7;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  }
+  .accom-note { color: #888; font-size: 11px; }
+  .map-chip {
+    display: inline-flex; align-items: center;
+    background: var(--alpine); color: white;
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 12px;
+    text-decoration: none; white-space: nowrap;
+  }
+  .places-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  /* ─── GOOGLE PHOTOS STEPS ───────────────────── */
+  .gp-step { border: 1.5px solid var(--mist); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .gp-step-header {
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    cursor: pointer; background: var(--snow); user-select: none;
+  }
+  .gp-num {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--alpine); color: white;
+    font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .gp-label { flex: 1; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .gp-arrow { font-size: 11px; color: #aaa; transition: transform 0.2s; }
+  .gp-step.open .gp-arrow { transform: rotate(90deg); }
+  .gp-step-body {
+    display: none; padding: 12px 14px 14px 48px;
+    font-size: 12px; color: #555; line-height: 1.75;
+    border-top: 1px solid var(--mist); background: white;
+  }
+  .gp-step.open .gp-step-body { display: block; }
+
+  /* ─── EMPTY STATE ────────────────────────────── */
+  .empty-state { text-align: center; padding: 40px 20px; color: #aaa; }
+  .empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 13px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="app-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h1 id="app-title">🏔 몽블랑 일기</h1>
+      <div class="subtitle">7/28 – 8/9 · 밀라노 · 몽블랑 · 피렌체 · 로마</div>
+    </div>
+    <button onclick="changeName()" style="background:rgba(255,255,255,0.15);border:none;color:white;font-size:11px;padding:5px 10px;border-radius:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✏️ 이름</button>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('timeline')">
+      <span class="tab-icon">📅</span>타임라인
+    </button>
+    <button class="nav-tab" onclick="switchTab('write')">
+      <span class="tab-icon">✏️</span>기록
+    </button>
+    <button class="nav-tab" onclick="switchTab('money')">
+      <span class="tab-icon">💶</span>정산
+    </button>
+    <button class="nav-tab" onclick="switchTab('export')">
+      <span class="tab-icon">📤</span>내보내기
+    </button>
+  </div>
+
+  <!-- TIMELINE -->
+  <div id="screen-timeline" class="screen active">
+    <div class="timeline" id="timeline-list"></div>
+  </div>
+
+  <!-- WRITE -->
+  <div id="screen-write" class="screen write-screen">
+    <div class="write-day-selector" id="day-selector"></div>
+    <div class="write-form">
+      <label class="form-label">날씨</label>
+      <div class="weather-row" id="weather-row">
+        <button class="weather-btn" data-w="☀️" onclick="selectWeather(this)">☀️</button>
+        <button class="weather-btn" data-w="⛅" onclick="selectWeather(this)">⛅</button>
+        <button class="weather-btn" data-w="🌧" onclick="selectWeather(this)">🌧</button>
+        <button class="weather-btn" data-w="🌩" onclick="selectWeather(this)">🌩</button>
+        <button class="weather-btn" data-w="❄️" onclick="selectWeather(this)">❄️</button>
+      </div>
+
+      <label class="form-label">오늘의 기분</label>
+      <div class="mood-row" id="mood-row">
+        <button class="mood-btn" onclick="selectMood(this)">😊 행복</button>
+        <button class="mood-btn" onclick="selectMood(this)">😤 지침</button>
+        <button class="mood-btn" onclick="selectMood(this)">🤩 감동</button>
+        <button class="mood-btn" onclick="selectMood(this)">😰 힘듦</button>
+        <button class="mood-btn" onclick="selectMood(this)">😌 평온</button>
+        <button class="mood-btn" onclick="selectMood(this)">🥹 뭉클</button>
+      </div>
+
+      <label class="form-label">오늘 일기</label>
+      <textarea class="form-textarea" id="diary-text" placeholder="오늘 어땠어요? 날씨, 풍경, 발 상태, 무엇이든…"></textarea>
+
+      <label class="form-label">오늘의 한 문장 (앨범 캡션용)</label>
+      <input class="form-input" id="one-liner" type="text" placeholder="ex. 처음으로 만난 빙하, 그 푸른색이 잊히지 않아">
+
+      <label class="form-label">사진 추가</label>
+      <div class="photo-upload-area" onclick="document.getElementById('photo-input').click()">
+        <div class="upload-icon">📷</div>
+        <p>탭해서 사진 추가<br><span style="font-size:10px">최대 30장</span></p>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" multiple onchange="addPhotos(event)">
+      <div class="photo-preview-row" id="photo-preview"></div>
+
+      <button class="save-btn" onclick="saveEntry()">💾 저장하기</button>
+    </div>
+  </div>
+
+  <!-- MONEY -->
+  <div id="screen-money" class="screen export-screen">
+
+    <!-- 환율 계산기 -->
+    <div class="export-card">
+      <h3>💶 유로 환율 계산기</h3>
+      <p style="margin-bottom:14px;">환율을 직접 입력하고 유로 ↔ 원화를 빠르게 계산하세요.</p>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:12px;color:#888;white-space:nowrap;">1 EUR =</span>
+        <input id="rate-input" class="form-input" type="number" placeholder="1480" style="flex:1;"
+          oninput="calcRate()" value="">
+        <span style="font-size:12px;color:#888;white-space:nowrap;">원</span>
+        <button onclick="fetchRate()" style="background:var(--alpine);color:white;border:none;border-radius:8px;padding:9px 12px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">🔄 실시간</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:8px;">
+        <div>
+          <div style="font-size:10px;color:#888;margin-bottom:4px;">EUR (유로)</div>
+          <input id="eur-input" class="form-input" type="number" placeholder="0" oninput="fromEur()">
+        </div>
+        <div style="font-size:20px;text-align:center;color:#aaa;">⇄</div>
+        <div>
+          <div style="font-size:10px;color:#888;margin-bottom:4px;">KRW (원화)</div>
+          <input id="krw-input" class="form-input" type="number" placeholder="0" oninput="fromKrw()">
+        </div>
+      </div>
+      <div id="rate-display" style="text-align:center;font-size:11px;color:#aaa;margin-top:4px;">환율을 입력하거나 실시간 버튼을 눌러주세요</div>
+    </div>
+
+    <!-- 지출 입력 -->
+    <div class="export-card">
+      <h3>🧾 지출 기록</h3>
+      <p style="margin-bottom:12px;">날짜별로 지출을 기록하고 정산해요.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <select id="exp-day" class="form-input" style="flex:1.2;">
+          <option value="">날짜</option>
+        </select>
+        <select id="exp-cat" class="form-input" style="flex:1;">
+          <option value="식비">🍽 식비</option>
+          <option value="교통">🚆 교통</option>
+          <option value="숙소">🏨 숙소</option>
+          <option value="관광">🎫 관광</option>
+          <option value="쇼핑">🛍 쇼핑</option>
+          <option value="기타">💸 기타</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input id="exp-desc" class="form-input" type="text" placeholder="내용 (예: 젤라또)" style="flex:2;">
+        <input id="exp-amount" class="form-input" type="number" placeholder="EUR" style="flex:1;">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <select id="exp-who" class="form-input" style="flex:1;">
+          <option value="망고">망고</option>
+          <option value="언니">언니</option>
+          <option value="공통">공통</option>
+        </select>
+        <button onclick="addExpense()" style="flex:1;background:var(--alpine);color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 추가</button>
+      </div>
+    </div>
+
+    <!-- 정산 요약 -->
+    <div class="export-card">
+      <h3>📊 정산 요약</h3>
+      <div id="expense-summary"></div>
+    </div>
+
+    <!-- 지출 목록 -->
+    <div class="export-card">
+      <h3>📋 지출 목록</h3>
+      <div id="expense-list"></div>
+      <button onclick="exportExpense()" style="width:100%;margin-top:12px;padding:11px;background:var(--moss);color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📄 정산 내보내기 (.txt)</button>
+    </div>
+
+  </div>
+  <div id="screen-export" class="screen export-screen">
+    <div id="export-stats"></div>
+
+    <div class="export-card">
+      <h3>📄 전체 일기 텍스트</h3>
+      <p>날짜순으로 정리된 일기 전체. 포토북 업체 텍스트 제출, 블로그 초고로 활용하세요.</p>
+      <button class="export-btn primary" onclick="exportText()">텍스트 내보내기 (.txt)</button>
+    </div>
+
+    <div class="export-card">
+      <h3>🎬 영상 편집용 캡션 목록</h3>
+      <p>"오늘의 한 문장"만 13일치 정리. 릴스/쇼츠 자막, 인스타 캡션으로 바로 쓰세요.</p>
+      <button class="export-btn secondary" onclick="exportCaptions()">캡션 목록 내보내기 (.txt)</button>
+    </div>
+
+    <div class="export-card">
+      <h3>🗂 사진 ZIP 내보내기</h3>
+      <p>앱에 저장된 사진을 날짜별 파일명으로 묶어서 한 번에 다운로드. 영상 편집 소스로 바로 쓸 수 있어요.</p>
+      <p style="font-size:11px;color:#aaa;margin-bottom:10px;">예) <code>Day01_7월28일_밀라노도착_사진1.jpg</code></p>
+      <button class="export-btn" style="background:var(--glacier);color:white;" onclick="exportZip()">📦 사진 ZIP 다운로드</button>
+    </div>
+
+    <div class="export-card">
+      <h3>📱 구글 포토 연동 워크플로우</h3>
+      <p style="margin-bottom:12px;">앱 사진과 별개로, <b>폰 카메라로 찍은 전체 사진</b>을 영상/앨범으로 만드는 흐름이에요.</p>
+      <div id="gp-steps">
+        <div class="gp-step" data-step="0">
+          <div class="gp-step-header" onclick="toggleStep(0)">
+            <span class="gp-num">1</span>
+            <span class="gp-label">현지에서 — 구글 포토 자동백업 켜기</span>
+            <span class="gp-arrow">▸</span>
+          </div>
+          <div class="gp-step-body">구글 포토 앱 → 설정 → 백업 → <b>켜기</b>. Wi-Fi 있을 때(헛집, 카페)마다 자동으로 구글 드라이브에 업로드돼요. 배터리/데이터 걱정 없이 찍기만 하면 됨.</div>
+        </div>
+        <div class="gp-step" data-step="1">
+          <div class="gp-step-header" onclick="toggleStep(1)">
+            <span class="gp-num">2</span>
+            <span class="gp-label">돌아와서 — 날짜별 앨범 만들기</span>
+            <span class="gp-arrow">▸</span>
+          </div>
+          <div class="gp-step-body">구글 포토 PC 버전 → 날짜 기준으로 자동 정렬돼 있음 → "앨범 만들기"로 1일차~13일차 분리. 여기서 포토북 업체에 바로 공유 가능 (포토몬, 스냅스 모두 구글 포토 연동 지원).</div>
+        </div>
+        <div class="gp-step" data-step="2">
+          <div class="gp-step-header" onclick="toggleStep(2)">
+            <span class="gp-num">3</span>
+            <span class="gp-label">영상 편집 — 캡컷에 불러오기</span>
+            <span class="gp-arrow">▸</span>
+          </div>
+          <div class="gp-step-body">캡컷 앱 → 새 프로젝트 → 구글 포토에서 날짜별로 선택해서 불러오기. 이 앱에서 내보낸 <b>캡션 목록</b>을 열어두고 날짜 순서대로 자막 입력하면 브이로그/릴스 완성.</div>
+        </div>
+        <div class="gp-step" data-step="3">
+          <div class="gp-step-header" onclick="toggleStep(3)">
+            <span class="gp-num">4</span>
+            <span class="gp-label">포토북 만들기</span>
+            <span class="gp-arrow">▸</span>
+          </div>
+          <div class="gp-step-body">스냅스/포토몬 앱 → 포토북 선택 → 구글 포토 연동해서 날짜별 사진 배치 → 이 앱에서 내보낸 <b>텍스트 파일</b>에서 해당 날짜 일기 복붙해서 캡션 입력. 1~2시간이면 완성돼요.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="export-card">
+      <h3>🗑 데이터 초기화</h3>
+      <p>여행 종료 후 새 여행 준비할 때. <strong>삭제 후 복구 불가.</strong></p>
+      <button class="export-btn" style="background:#eee;color:#888;" onclick="clearAll()">전체 초기화</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="detail-overlay" id="detail-overlay">
+  <div class="detail-header">
+    <button class="back-btn" onclick="closeDetail()">←</button>
+    <div class="detail-title" id="detail-title"></div>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── DATA ───────────────────────────────────────
+const TRIP = [
+  {
+    day: 1, date: '7/28(화)', label: '밀라노 도착', type: 'city',
+    schedule: [
+      { time: '13:40', desc: '인천 출발' },
+      { time: '20:00', desc: '밀라노 말펜사 공항 도착' },
+      { time: '20:30', desc: '말펜사익스프레스 탑승 → Cadorna역 (1시간, €13)' },
+      { time: '~22:00', desc: '숙소 체크인 후 휴식' },
+    ],
+    accommodation: { name: '쉐라톤 밀라노 말펜사', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '공항 직결 · 수영장·헬스장 있음' },
+  },
+  {
+    day: 2, date: '7/29(수)', label: '밀라노 자유여행', type: 'city',
+    schedule: [
+      { time: '12:30', desc: '🎨 최후의 만찬 관람 (산타마리아 델 그라치에 교회) — 예약 완료' },
+      { time: '오전', desc: '두오모 성당 & 두오모 광장 (밀라노패스)' },
+      { time: '오후', desc: '갤러리아 비토리오 에마누엘레 2세 → 브레라 미술관' },
+      { time: '저녁', desc: '파르코 셈피오네 (공원) 산책' },
+      { time: '20:30', desc: '밀라노 공항 2터미널 — 언니 팀과 합류' },
+    ],
+    accommodation: { name: '쉐라톤 밀라노 말펜사', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '공항 직결' },
+    places: [
+      { name: '최후의 만찬 (산타마리아 델 그라치에)', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7' },
+      { name: '밀라노 두오모', map: 'https://www.duomomilano.it/en/' },
+    ]
+  },
+  {
+    day: 3, date: '7/30(목)', label: '트레킹 1일차', type: 'trekking',
+    schedule: [
+      { time: '오전', desc: '트레킹 출발 (가이드 팀 합류)' },
+      { time: '종일', desc: '몽블랑 트레킹 1일차 코스' },
+      { time: '저녁', desc: '산장(헛집) 도착 · 저녁 식사 포함' },
+    ],
+    accommodation: { name: '몽블랑 트레킹 산장 (1일차)', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '가이드 배정 숙소' },
+  },
+  {
+    day: 4, date: '7/31(금)', label: '트레킹 2일차', type: 'trekking',
+    schedule: [
+      { time: '아침', desc: '산장 조식 후 출발' },
+      { time: '종일', desc: '몽블랑 트레킹 2일차 코스 · 샤모니(Chamonix) 구간' },
+      { time: '저녁', desc: '산장 도착 · 저녁 식사 포함' },
+    ],
+    accommodation: { name: '샤모니 구간 산장', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '샤모니 몽블랑 일대' },
+  },
+  {
+    day: 5, date: '8/1(토)', label: '트레킹 3일차', type: 'trekking',
+    schedule: [
+      { time: '아침', desc: '산장 조식 후 출발' },
+      { time: '종일', desc: '몽블랑 트레킹 3일차 · 프랑스→이탈리아 국경 구간' },
+      { time: '저녁', desc: '쿠르마이외르(Courmayeur) 인근 산장' },
+    ],
+    accommodation: { name: '쿠르마이외르 인근 산장', map: 'https://maps.app.goo.gl/Z5571sXw4hMLDoSX6?g_st=akt', note: '이탈리아 측 코스' },
+  },
+  {
+    day: 6, date: '8/2(일)', label: '트레킹 4일차', type: 'trekking',
+    schedule: [
+      { time: '아침', desc: '산장 조식 후 출발' },
+      { time: '종일', desc: '몽블랑 트레킹 4일차 · 스위스 구간 진입' },
+      { time: '저녁', desc: '스위스 구간 산장' },
+    ],
+    accommodation: { name: '스위스 구간 산장', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '3개국(프·이·스) 통과' },
+  },
+  {
+    day: 7, date: '8/3(월)', label: '트레킹 5일차', type: 'trekking',
+    schedule: [
+      { time: '아침', desc: '산장 조식 후 출발' },
+      { time: '종일', desc: '몽블랑 트레킹 5일차' },
+      { time: '저녁', desc: '산장 도착' },
+    ],
+    accommodation: { name: '트레킹 5일차 산장', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '가이드 배정' },
+  },
+  {
+    day: 8, date: '8/4(화)', label: '트레킹 6일차 (완주)', type: 'trekking',
+    schedule: [
+      { time: '아침', desc: '마지막 산장 조식 후 출발' },
+      { time: '종일', desc: '몽블랑 트레킹 6일차 · 완주 🎉' },
+      { time: '저녁', desc: '트레킹 종료 · 이동 준비' },
+    ],
+    accommodation: { name: '트레킹 종료 지점 숙소', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '완주 축하 🎊' },
+  },
+  {
+    day: 9, date: '8/5(수)', label: '피렌체 이동', type: 'city',
+    schedule: [
+      { time: '저녁 7시', desc: '밀라노 말펜사 공항 도착 (언니 팀과 합류)' },
+      { time: '~8시', desc: '말펜사 → 밀라노 센트랄역 (1시간)' },
+      { time: '~10시', desc: '밀라노 센트랄 → 피렌체 산타마리아노벨라역 (2시간, 오미오 앱 예매)' },
+    ],
+    accommodation: { name: 'C-Hotels Ambasciatori 피렌체', map: 'https://maps.app.goo.gl/Z5571sXw4hMLDoSX6?g_st=akt', note: '산타마리아노벨라역 바로 앞 · 2박 (8/5~8/7)' },
+  },
+  {
+    day: 10, date: '8/6(목)', label: '피렌체', type: 'city',
+    schedule: [
+      { time: '아침', desc: '아침 조깅 (아르노강 변 추천)' },
+      { time: '오전', desc: '우피치 미술관 or 아카데미아 미술관 (다비드 상)' },
+      { time: '점심', desc: '🍽 Trattoria Mario 또는 Trattoria Zà Zà' },
+      { time: '오후', desc: '두오모 (산타마리아 델 피오레) · 산 로렌초 시장 · 가죽 쇼핑' },
+      { time: '저녁', desc: '와이너리 or La Bussola' },
+    ],
+    accommodation: { name: 'C-Hotels Ambasciatori 피렌체', map: 'https://maps.app.goo.gl/Z5571sXw4hMLDoSX6?g_st=akt', note: '산타마리아노벨라역 바로 앞' },
+    places: [
+      { name: 'La Bussola', map: 'https://maps.app.goo.gl/ZrFW7zKR7MHDxuR7A?g_st=akt' },
+      { name: 'Trattoria Mario', map: 'https://maps.app.goo.gl/DDsaAQRrrp29tLUn8?g_st=akt' },
+      { name: 'Trattoria Zà Zà', map: 'https://maps.app.goo.gl/MHj5h8T9JhFU8VqP9?g_st=akt' },
+      { name: 'Trattoria Dalloste', map: 'https://maps.app.goo.gl/uRwjtxj3wuGf6dor7?g_st=akt' },
+    ]
+  },
+  {
+    day: 11, date: '8/7(금)', label: '피렌체→로마', type: 'city',
+    schedule: [
+      { time: '오전', desc: '피렌체 자유 시간' },
+      { time: '저녁', desc: '기차 or 이동 → 로마 도착' },
+      { time: '저녁', desc: '로마 숙소 체크인' },
+    ],
+    accommodation: { name: '로마 숙소', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '금·토 2박 (노션에 미정)' },
+  },
+  {
+    day: 12, date: '8/8(토)', label: '로마', type: 'city',
+    schedule: [
+      { time: '오전', desc: '바티칸 박물관 · 시스티나 성당 (반나절, 가이드 예정)' },
+      { time: '오후', desc: '콜로세움 · 트레비 분수 · 스페인 광장' },
+      { time: '저녁', desc: '로마 맛집 탐방' },
+    ],
+    accommodation: { name: '로마 숙소', map: 'https://maps.app.goo.gl/Pw2PNvzJrrU2X72m7', note: '2박째' },
+  },
+  {
+    day: 13, date: '8/9(일)', label: '귀국', type: 'city',
+    schedule: [
+      { time: '오전', desc: '로마 자유 시간 · 마지막 쇼핑' },
+      { time: '21:25', desc: '로마 피우미치노 공항 출발 ✈️' },
+    ],
+    accommodation: { name: '비행기 (로마→서울)', map: '', note: '8/10(월) 15:40 인천 도착' },
+  },
+];
+
+let entries = JSON.parse(localStorage.getItem('mango_diary') || '{}');
+let currentDay = 1;
+let currentWeather = '';
+let currentMood = '';
+let currentPhotos = []; // base64 array
+
+function save() {
+  localStorage.setItem('mango_diary', JSON.stringify(entries));
+}
+
+// ─── TAB ────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  const tabs = ['timeline','write','money','export'];
+  document.querySelectorAll('.nav-tab')[tabs.indexOf(tab)].classList.add('active');
+  if (tab === 'timeline') renderTimeline();
+  if (tab === 'write') renderWriteTab();
+  if (tab === 'money') renderMoney();
+  if (tab === 'export') renderExport();
+}
+
+// ─── TIMELINE ────────────────────────────────────
+function renderTimeline() {
+  const list = document.getElementById('timeline-list');
+  list.innerHTML = '';
+  TRIP.forEach(d => {
+    const e = entries[d.day];
+    const card = document.createElement('div');
+    card.className = 'day-card';
+    card.onclick = () => openDetail(d.day);
+
+    const tagClass = d.type === 'trekking' ? 'tag-trekking' : 'tag-city';
+    const tagText = d.type === 'trekking' ? '🏔 트레킹' : '🏙 도시';
+    const numClass = e ? d.type : 'empty';
+    const status = e ? '📝' : '○';
+
+    let photosHtml = '';
+    if (e && e.photos && e.photos.length > 0) {
+      photosHtml = '<div class="day-photos">' +
+        e.photos.slice(0,4).map(p => `<img class="day-photo-thumb" src="${p}">`).join('') +
+        '</div>';
+    } else if (e) {
+      photosHtml = '<div class="day-photos"><div class="photo-placeholder">📷</div></div>';
+    }
+
+    // 자세한 일정 섹션
+    const scheduleRows = d.schedule.map(s =>
+      `<div class="sched-row"><span class="sched-time">${s.time}</span><span class="sched-desc">${s.desc}</span></div>`
+    ).join('');
+
+    const placesHtml = d.places ? d.places.map(p =>
+      `<a class="map-chip" href="${p.map}" target="_blank">📍 ${p.name}</a>`
+    ).join('') : '';
+
+    const accomHtml = d.accommodation
+      ? `<div class="accom-row">
+          🏨 <strong>${d.accommodation.name}</strong>
+          ${d.accommodation.note ? `<span class="accom-note">${d.accommodation.note}</span>` : ''}
+          ${d.accommodation.map ? `<a class="map-chip" href="${d.accommodation.map}" target="_blank">🗺 지도</a>` : ''}
+        </div>` : '';
+
+    card.innerHTML = `
+      <span class="day-tag ${tagClass}">${tagText}</span>
+      <div class="day-card-header">
+        <div class="day-number ${numClass}">${d.day}</div>
+        <div class="day-meta">
+          <div class="day-date">${d.date} · ${d.label}</div>
+          <div class="day-location">${e ? (e.weather || '') + ' ' + (e.mood || '') : '아직 기록 없음'}</div>
+        </div>
+        <div class="day-status">${status}</div>
+      </div>
+      ${e && e.text ? `<div class="day-preview">${e.text}</div>` : ''}
+      ${photosHtml}
+      <div class="schedule-section">
+        <div class="schedule-toggle" onclick="toggleSchedule(event, ${d.day})">
+          📋 자세한 일정 <span class="sched-arrow" id="sarrow-${d.day}">▸</span>
+        </div>
+        <div class="schedule-body" id="sbody-${d.day}" style="display:none;">
+          ${scheduleRows}
+          ${accomHtml}
+          ${placesHtml ? `<div class="places-row">${placesHtml}</div>` : ''}
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ─── SCHEDULE TOGGLE ─────────────────────────────
+function toggleSchedule(e, day) {
+  e.stopPropagation();
+  const body = document.getElementById(`sbody-${day}`);
+  const arrow = document.getElementById(`sarrow-${day}`);
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent = isOpen ? '▸' : '▾';
+}
+
+// ─── WRITE ───────────────────────────────────────
+function renderWriteTab() {
+  const sel = document.getElementById('day-selector');
+  sel.innerHTML = '';
+  TRIP.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'write-day-btn' + (d.day === currentDay ? ' selected' : '');
+    btn.textContent = `${d.day}일 ${d.date}`;
+    btn.onclick = () => loadDay(d.day);
+    sel.appendChild(btn);
+  });
+  loadDay(currentDay);
+}
+
+function loadDay(day) {
+  currentDay = day;
+  document.querySelectorAll('.write-day-btn').forEach((b, i) => {
+    b.classList.toggle('selected', TRIP[i].day === day);
+  });
+  const e = entries[day] || {};
+  document.getElementById('diary-text').value = e.text || '';
+  document.getElementById('one-liner').value = e.oneLiner || '';
+  currentWeather = e.weather || '';
+  currentMood = e.mood || '';
+  currentPhotos = e.photos ? [...e.photos] : [];
+  document.querySelectorAll('.weather-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.w === currentWeather);
+  });
+  document.querySelectorAll('.mood-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent.trim() === currentMood);
+  });
+  renderPhotoPreviews();
+}
+
+function selectWeather(btn) {
+  currentWeather = btn.dataset.w;
+  document.querySelectorAll('.weather-btn').forEach(b => b.classList.toggle('selected', b === btn));
+}
+function selectMood(btn) {
+  currentMood = btn.textContent.trim();
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.toggle('selected', b === btn));
+}
+
+function addPhotos(e) {
+  const files = Array.from(e.target.files);
+  files.forEach(f => {
+    if (currentPhotos.length >= 30) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      currentPhotos.push(ev.target.result);
+      renderPhotoPreviews();
+    };
+    reader.readAsDataURL(f);
+  });
+  e.target.value = '';
+}
+
+function renderPhotoPreviews() {
+  const row = document.getElementById('photo-preview');
+  row.innerHTML = '';
+  currentPhotos.forEach((p, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-wrap';
+    wrap.innerHTML = `
+      <img class="preview-thumb" src="${p}">
+      <button class="preview-remove" onclick="removePhoto(${i})">×</button>
+    `;
+    row.appendChild(wrap);
+  });
+}
+
+function removePhoto(i) {
+  currentPhotos.splice(i, 1);
+  renderPhotoPreviews();
+}
+
+function saveEntry() {
+  entries[currentDay] = {
+    text: document.getElementById('diary-text').value,
+    oneLiner: document.getElementById('one-liner').value,
+    weather: currentWeather,
+    mood: currentMood,
+    photos: [...currentPhotos],
+    savedAt: new Date().toISOString(),
+  };
+  save();
+  showToast('💾 저장됐어요!');
+  renderTimeline();
+}
+
+// ─── DETAIL ──────────────────────────────────────
+function openDetail(day) {
+  const d = TRIP.find(t => t.day === day);
+  const e = entries[day];
+  if (!e) { showToast('아직 기록이 없어요'); return; }
+
+  document.getElementById('detail-title').textContent = `${d.day}일차 · ${d.date}`;
+  const body = document.getElementById('detail-body');
+
+  let photosHtml = '';
+  if (e.photos && e.photos.length > 0) {
+    photosHtml = `<div class="detail-photos">${e.photos.map(p => `<img class="detail-photo" src="${p}">`).join('')}</div>`;
+  }
+
+  body.innerHTML = `
+    <div class="detail-weather">${e.weather || ''}</div>
+    ${e.mood ? `<div class="detail-mood-chip">${e.mood}</div>` : ''}
+    ${e.oneLiner ? `<blockquote style="font-family:'Noto Serif KR',serif;font-size:15px;color:var(--alpine);font-weight:600;margin-bottom:16px;padding-left:12px;border-left:3px solid var(--glacier);">"${e.oneLiner}"</blockquote>` : ''}
+    ${photosHtml}
+    <div class="detail-text">${e.text || ''}</div>
+    <button class="detail-edit-btn" onclick="editDay(${day})">✏️ 수정하기</button>
+  `;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.remove('open');
+}
+
+function editDay(day) {
+  closeDetail();
+  loadDay(day);
+  switchTab('write');
+  setTimeout(() => {
+    document.querySelectorAll('.write-day-btn').forEach((b, i) => {
+      if (TRIP[i].day === day) b.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+    });
+  }, 100);
+}
+
+// ─── EXPORT ──────────────────────────────────────
+function renderExport() {
+  const filled = Object.keys(entries).length;
+  const photos = Object.values(entries).reduce((sum, e) => sum + (e.photos?.length || 0), 0);
+  document.getElementById('export-stats').innerHTML = `
+    <div class="stat-row">
+      <div class="stat-box"><div class="stat-num">${filled}</div><div class="stat-label">기록한 날</div></div>
+      <div class="stat-box"><div class="stat-num">${13 - filled}</div><div class="stat-label">남은 날</div></div>
+      <div class="stat-box"><div class="stat-num">${photos}</div><div class="stat-label">저장된 사진</div></div>
+    </div>
+  `;
+}
+
+function exportText() {
+  let text = '🏔 망고의 몽블랑+이탈리아 여행 일기\n7/28 – 8/9\n\n' + '─'.repeat(30) + '\n\n';
+  TRIP.forEach(d => {
+    const e = entries[d.day];
+    text += `📅 ${d.day}일차 · ${d.date} · ${d.label}\n`;
+    if (e) {
+      if (e.weather) text += `날씨: ${e.weather}\n`;
+      if (e.mood) text += `기분: ${e.mood}\n`;
+      if (e.oneLiner) text += `✦ ${e.oneLiner}\n`;
+      if (e.text) text += `\n${e.text}\n`;
+    } else {
+      text += '(기록 없음)\n';
+    }
+    text += '\n' + '─'.repeat(30) + '\n\n';
+  });
+  download('mango_montblanc_diary.txt', text);
+  showToast('📄 텍스트 파일 저장됨');
+}
+
+function exportCaptions() {
+  let text = '🎬 망고의 여행 캡션 목록\n\n';
+  TRIP.forEach(d => {
+    const e = entries[d.day];
+    const line = e?.oneLiner ? `"${e.oneLiner}"` : '(미작성)';
+    text += `${d.day}일 ${d.date} · ${d.label}\n${line}\n\n`;
+  });
+  download('mango_captions.txt', text);
+  showToast('🎬 캡션 목록 저장됨');
+}
+
+function download(filename, text) {
+  const a = document.createElement('a');
+  a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+  a.download = filename;
+  a.click();
+}
+
+function clearAll() {
+  if (confirm('모든 일기 데이터를 삭제할까요? 복구 불가!')) {
+    entries = {};
+    save();
+    renderExport();
+    showToast('🗑 초기화 완료');
+  }
+}
+
+// ─── RATE CALCULATOR ─────────────────────────────
+let currentRate = parseFloat(localStorage.getItem('eur_rate') || '0');
+
+function calcRate() {
+  currentRate = parseFloat(document.getElementById('rate-input').value) || 0;
+  if (currentRate) localStorage.setItem('eur_rate', currentRate);
+  updateRateDisplay();
+}
+
+function fromEur() {
+  if (!currentRate) { showToast('환율을 먼저 입력해주세요'); return; }
+  const eur = parseFloat(document.getElementById('eur-input').value) || 0;
+  document.getElementById('krw-input').value = Math.round(eur * currentRate).toLocaleString();
+}
+
+function fromKrw() {
+  if (!currentRate) { showToast('환율을 먼저 입력해주세요'); return; }
+  const krw = parseFloat(document.getElementById('krw-input').value.replace(/,/g,'')) || 0;
+  document.getElementById('eur-input').value = (krw / currentRate).toFixed(2);
+}
+
+function updateRateDisplay() {
+  const el = document.getElementById('rate-display');
+  if (!el) return;
+  if (currentRate) {
+    el.textContent = `1 EUR = ${currentRate.toLocaleString()}원 · 10 EUR = ${(currentRate*10).toLocaleString()}원 · 100 EUR = ${(currentRate*100).toLocaleString()}원`;
+    el.style.color = 'var(--alpine)';
+  }
+}
+
+async function fetchRate() {
+  showToast('🔄 환율 불러오는 중…');
+  try {
+    const res = await fetch('https://api.exchangerate-api.com/v4/latest/EUR');
+    const data = await res.json();
+    const rate = Math.round(data.rates.KRW);
+    currentRate = rate;
+    localStorage.setItem('eur_rate', rate);
+    document.getElementById('rate-input').value = rate;
+    updateRateDisplay();
+    showToast(`✅ 1 EUR = ${rate.toLocaleString()}원`);
+  } catch {
+    showToast('❌ 환율 불러오기 실패 (오프라인?)');
+  }
+}
+
+// ─── EXPENSES ────────────────────────────────────
+let expenses = JSON.parse(localStorage.getItem('mango_expenses') || '[]');
+
+function saveExpenses() {
+  localStorage.setItem('mango_expenses', JSON.stringify(expenses));
+}
+
+function renderMoney() {
+  // 날짜 셀렉터 채우기
+  const sel = document.getElementById('exp-day');
+  if (sel.children.length <= 1) {
+    TRIP.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.day;
+      opt.textContent = `${d.day}일 ${d.date}`;
+      sel.appendChild(opt);
+    });
+  }
+  // 이름 반영
+  const myName = localStorage.getItem('mango_diary_name') || '망고';
+  document.getElementById('exp-who').options[0].text = myName;
+  document.getElementById('exp-who').options[0].value = myName;
+
+  // 환율 복원
+  if (currentRate) {
+    document.getElementById('rate-input').value = currentRate;
+    updateRateDisplay();
+  }
+
+  renderExpenseList();
+  renderExpenseSummary();
+}
+
+function addExpense() {
+  const day = document.getElementById('exp-day').value;
+  const desc = document.getElementById('exp-desc').value.trim();
+  const amount = parseFloat(document.getElementById('exp-amount').value);
+  const cat = document.getElementById('exp-cat').value;
+  const who = document.getElementById('exp-who').value;
+  if (!day || !desc || !amount) { showToast('날짜, 내용, 금액을 입력해주세요'); return; }
+  expenses.push({ id: Date.now(), day: parseInt(day), desc, amount, cat, who });
+  saveExpenses();
+  document.getElementById('exp-desc').value = '';
+  document.getElementById('exp-amount').value = '';
+  renderExpenseList();
+  renderExpenseSummary();
+  showToast('✅ 추가됐어요');
+}
+
+function deleteExpense(id) {
+  expenses = expenses.filter(e => e.id !== id);
+  saveExpenses();
+  renderExpenseList();
+  renderExpenseSummary();
+}
+
+function renderExpenseList() {
+  const el = document.getElementById('expense-list');
+  if (!el) return;
+  if (expenses.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px 0;">아직 지출이 없어요</div>';
+    return;
+  }
+  const sorted = [...expenses].sort((a,b) => a.day - b.day);
+  el.innerHTML = sorted.map(e => {
+    const trip = TRIP.find(t => t.day === e.day);
+    const krw = currentRate ? `<span style="color:#aaa;font-size:11px;"> ≈ ${Math.round(e.amount * currentRate).toLocaleString()}원</span>` : '';
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--mist);">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:500;">${e.cat} ${e.desc}</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${trip ? trip.date : ''} · ${e.who}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:700;color:var(--alpine);">€${e.amount.toFixed(2)}</div>
+          ${krw}
+        </div>
+        <button onclick="deleteExpense(${e.id})" style="background:none;border:none;font-size:16px;cursor:pointer;color:#ccc;padding:4px;">×</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderExpenseSummary() {
+  const el = document.getElementById('expense-summary');
+  if (!el) return;
+  const total = expenses.reduce((s, e) => s + e.amount, 0);
+  const myName = localStorage.getItem('mango_diary_name') || '망고';
+  const myTotal = expenses.filter(e => e.who === myName || e.who === '공통').reduce((s, e) => s + (e.who === '공통' ? e.amount/2 : e.amount), 0);
+  const sisterTotal = expenses.filter(e => e.who === '언니' || e.who === '공통').reduce((s, e) => s + (e.who === '공통' ? e.amount/2 : e.amount), 0);
+
+  const bycat = {};
+  expenses.forEach(e => { bycat[e.cat] = (bycat[e.cat] || 0) + e.amount; });
+  const catRows = Object.entries(bycat).sort((a,b)=>b[1]-a[1])
+    .map(([cat, amt]) => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;"><span>${cat}</span><span style="font-weight:600;">€${amt.toFixed(2)}${currentRate ? ` <span style="color:#aaa;font-weight:400;">(${Math.round(amt*currentRate).toLocaleString()}원)</span>` : ''}</span></div>`).join('');
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+      <div class="stat-box"><div class="stat-num" style="font-size:18px;">€${total.toFixed(0)}</div><div class="stat-label">총 지출</div></div>
+      <div class="stat-box"><div class="stat-num" style="font-size:18px;">€${myTotal.toFixed(0)}</div><div class="stat-label">${myName} 부담</div></div>
+      <div class="stat-box"><div class="stat-num" style="font-size:18px;">€${sisterTotal.toFixed(0)}</div><div class="stat-label">언니 부담</div></div>
+    </div>
+    ${currentRate ? `<div style="font-size:12px;color:var(--alpine);text-align:center;margin-bottom:12px;font-weight:600;">총 ${Math.round(total*currentRate).toLocaleString()}원 · ${myName} ${Math.round(myTotal*currentRate).toLocaleString()}원</div>` : ''}
+    <div style="border-top:1px solid var(--mist);padding-top:12px;">${catRows || '<div style="color:#aaa;font-size:12px;">카테고리별 내역 없음</div>'}</div>
+  `;
+}
+
+function exportExpense() {
+  const myName = localStorage.getItem('mango_diary_name') || '망고';
+  let text = `💶 ${myName}의 몽블랑 여행 정산\n\n`;
+  const total = expenses.reduce((s,e)=>s+e.amount,0);
+  const sorted = [...expenses].sort((a,b)=>a.day-b.day);
+  sorted.forEach(e => {
+    const trip = TRIP.find(t=>t.day===e.day);
+    const krw = currentRate ? ` (≈${Math.round(e.amount*currentRate).toLocaleString()}원)` : '';
+    text += `${trip.date} [${e.cat}] ${e.desc} - €${e.amount.toFixed(2)}${krw} · ${e.who}\n`;
+  });
+  text += `\n${'─'.repeat(30)}\n총합: €${total.toFixed(2)}`;
+  if (currentRate) text += ` (≈${Math.round(total*currentRate).toLocaleString()}원)`;
+  download(`${myName}_여행정산.txt`, text);
+  showToast('📄 정산 내보내기 완료');
+}
+
+// ─── NAME ────────────────────────────────────────
+function loadName() {
+  const name = localStorage.getItem('mango_diary_name') || '망고';
+  document.getElementById('app-title').textContent = `🏔 ${name}의 몽블랑 일기`;
+}
+function changeName() {
+  const cur = localStorage.getItem('mango_diary_name') || '망고';
+  const name = prompt('이름을 입력하세요 (예: 망고, 언니)', cur);
+  if (name && name.trim()) {
+    localStorage.setItem('mango_diary_name', name.trim());
+    loadName();
+    showToast(`✅ "${name.trim()}"의 일기로 설정됨`);
+  }
+}
+
+// ─── ZIP EXPORT ──────────────────────────────────
+async function exportZip() {
+  const allPhotos = Object.entries(entries).filter(([,e]) => e.photos && e.photos.length > 0);
+  if (allPhotos.length === 0) {
+    showToast('저장된 사진이 없어요'); return;
+  }
+  showToast('📦 ZIP 만드는 중…');
+  const zip = new JSZip();
+  for (const [dayStr, e] of allPhotos) {
+    const day = parseInt(dayStr);
+    const trip = TRIP.find(t => t.day === day);
+    const folderName = `Day${String(day).padStart(2,'0')}_${trip.date.replace(/[()]/g,'')}_${trip.label}`;
+    e.photos.forEach((b64, i) => {
+      const ext = b64.startsWith('data:image/png') ? 'png' : 'jpg';
+      const data = b64.split(',')[1];
+      zip.file(`${folderName}/사진${i+1}.${ext}`, data, { base64: true });
+    });
+  }
+  const name = localStorage.getItem('mango_diary_name') || '망고';
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name}_몽블랑_사진.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ ZIP 다운로드 완료!');
+}
+
+// ─── GOOGLE PHOTOS STEPS ─────────────────────────
+function toggleStep(i) {
+  const steps = document.querySelectorAll('.gp-step');
+  steps[i].classList.toggle('open');
+}
+
+// ─── TOAST ───────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── INIT ────────────────────────────────────────
+loadName();
+renderTimeline();
+</script>
+</body>
+</html>
